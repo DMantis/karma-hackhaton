@@ -13,11 +13,11 @@ struct heir_rec {
   // heir's share in inheritance (percent, int from 0 to 100)
   uint8_t share;
 
-  // bool is_testator_dead;
+  bool is_testator_dead;
 
   uint64_t primary_key()const { return pkey; }
   account_name get_testator()const { return testator; }
-  uint8_t get_share()const {return share;}
+  uint8_t get_share()const {return share; }
 
   EOSLIB_SERIALIZE( heir_rec, (pkey)(name)(testator) )
 };
@@ -41,7 +41,7 @@ struct testator_rec {
   account_name name;
   // authority, which approved testator death, 0 if testator is alive
   account_name authority;
-  uint64_t primary_key()const { return name; }
+  account_name primary_key()const { return name; }
 
   EOSLIB_SERIALIZE( testator_rec, (name) )
 };
@@ -59,6 +59,7 @@ class inheritance : public contract {
     :contract(self),authorities_table(self, self){};
 
     multi_index<N(authorities), authority_rec> authorities_table;
+    multi_index<N(testators), testator_rec> testators_table;
     /*
       To check contract
     */
@@ -116,9 +117,9 @@ class inheritance : public contract {
       }
       eosio_assert(authorised == true, "run by one of the heirs");
       
-      // heir_table.modify(testator_itr, 0, [&]( auto& h_rec ) {
-      //   h_rec.is_testator_dead = true;
-      // });
+      heir_table.modify(testator_itr, 0, [&]( auto& h_rec ) {
+        h_rec.is_testator_dead = true;
+      });
 
       print(eosio::name{_self}, " claims that ", eosio::name{testator}, " is dead!");
     }
@@ -126,7 +127,6 @@ class inheritance : public contract {
     /*
       Claim that account_name owner is alive (run by account_name owner)
     */
-    
     // @abi_action
     void claimalive() { 
       auto header = "======== claim_alive function ========";
@@ -136,9 +136,13 @@ class inheritance : public contract {
       // todo add check that _self considered dead
       print(eosio::name{_self}, " claims that he is alive!");
 
-      account_name authority_name = eosio::chain::string_to_name(_self.authority);
-      auto authority_itr = authorities_table.find(authority_name)
+      account_name testator_name = eosio::chain::string_to_name(_self);
+      auto testator_itr = testators_table.find(testator_name);
 
+      eosio_assert(testator_itr == testators_table.end(), "testator not found");
+      auto authority_itr = authorities_table.find(testator_itr->authority);
+
+      eosio_assert(authority_itr == authorities_table.end(), "authority not found");
       // punishment for authority to claim that alive person is dead.
       authorities_table.modify(authority_itr, 0, [&]( auto& a_rec ) {
         a_rec.reputation = 0;
@@ -149,6 +153,8 @@ class inheritance : public contract {
     /*
         Prove that account_name owner is dead (run by witness/autority with rights to do that)  
         and send inheritance to testator's heirs.
+
+        TODO User permissions on ActiveKey
     */
     // @abi_action
     void sendinheritance(account_name testator) {
@@ -156,6 +162,13 @@ class inheritance : public contract {
       print(header, "\n" );
       // todo permissions check
       // todo majority check
+
+      // ask to permission 
+      // action(
+      //     permission_level{ from, N(active) },
+      //     N(eosio.token), N(transfer),
+      //     std::make_tuple(from, _self, testator.balance, std::string(""))
+      //  ).send();
 
       // autothority reward
       authorities_table.modify(authority_itr, 0, [&]( auto& a_rec ) {
