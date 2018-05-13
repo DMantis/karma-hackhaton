@@ -105,9 +105,9 @@ class inheritance : public contract {
       auto testator_index = heir_table.template get_index<N(bytestator)>();
       auto testator_itr = testator_index.find(testator);
       // print(testator_itr)
-      eosio_assert(testator_itr == heir_table.end(), "is not registered as testator");
+      eosio_assert(testator_itr == testator_index.end(), "is not registered as testator");
 
-      while (testator_itr != heir_table.end() && testator_itr->testator == testator) {
+      while (testator_itr != testator_index.end() && testator_itr->testator == testator) {
         if (_self != testator_itr->name) {
           testator_itr++;
         }
@@ -136,7 +136,7 @@ class inheritance : public contract {
       // todo add check that _self considered dead
       print(eosio::name{_self}, " claims that he is alive!");
 
-      account_name testator_name = eosio::chain::string_to_name(_self);
+      account_name testator_name = eosio::name{_self};
       auto testator_itr = testators_table.find(testator_name);
 
       eosio_assert(testator_itr == testators_table.end(), "testator not found");
@@ -184,7 +184,7 @@ class inheritance : public contract {
       auto testator_index = heir_table.template get_index<N(bytestator)>();
       auto testator_itr = testator_index.find(testator);
 
-      eosio_assert(testator_itr == heir_table.end(), "is not registered as testator");
+      eosio_assert(testator_itr != testator_index.end(), "is not registered as testator");
     }
 
 };
