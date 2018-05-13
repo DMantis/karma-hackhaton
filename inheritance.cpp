@@ -56,7 +56,7 @@ class inheritance : public contract {
   public:
     // using contract::contract;
     inheritance( account_name self )
-    :contract(self),authorities_table(self, self){};
+    :contract(self),authorities_table(_self, _self),testators_table(_self, _self){};
 
     multi_index<N(authorities), authority_rec> authorities_table;
     multi_index<N(testators), testator_rec> testators_table;
@@ -101,10 +101,8 @@ class inheritance : public contract {
 
       heir_table_type heir_table( code_account, testator );
 
-      // Nobody but heirs has right to claim that testator is dead!
       auto testator_index = heir_table.template get_index<N(bytestator)>();
       auto testator_itr = testator_index.find(testator);
-      // print(testator_itr)
       eosio_assert(testator_itr == testator_index.end(), "is not registered as testator");
 
       while (testator_itr != testator_index.end() && testator_itr->testator == testator) {
@@ -115,7 +113,8 @@ class inheritance : public contract {
           authorised = true;
         }
       }
-      eosio_assert(authorised == true, "run by one of the heirs");
+      // Nobody but heirs has right to claim that testator is dead!
+      eosio_assert(authorised == false, "run not by one of the heirs");
       
       heir_table.modify(testator_itr, 0, [&]( auto& h_rec ) {
         h_rec.is_testator_dead = true;
@@ -142,7 +141,7 @@ class inheritance : public contract {
       eosio_assert(testator_itr == testators_table.end(), "testator not found");
       auto authority_itr = authorities_table.find(testator_itr->authority);
 
-      eosio_assert(authority_itr == authorities_table.end(), "authority not found");
+      eosio_assert(authority_itr != authorities_table.end(), "authority not found");
       // punishment for authority to claim that alive person is dead.
       authorities_table.modify(authority_itr, 0, [&]( auto& a_rec ) {
         a_rec.reputation = 0;
